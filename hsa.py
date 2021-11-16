@@ -1,8 +1,9 @@
-from matplotlib import markers
+from matplotlib import use
 import matplotlib.pyplot as plt 
 import random
 import copy
 import math
+from itertools import product
 
 H, W = (50, 50)
 R = [5, 10]
@@ -19,20 +20,22 @@ for h in range(int(abs(H/cell_H))):
 lower = [(ue, ue) for ue in UE]
 upper = [(H-l[0], W-l[1]) for l in lower]
 
+
 min_noS = [int((W*H)/(36*ue**ue)) for ue in UE]
 max_noS = [int((W*H)/(4*ue*ue)) for ue in UE]
 
 
 
 class ObjectiveFunction(object):
-    def __init__(self, targets, alpha1=1, alpha2=0, beta1=1, beta2=0.5, threshold=0.9):
+    def __init__(self, targets, types=2, alpha1=1, alpha2=0, beta1=1, beta2=0.5, threshold=0.9):
         self.targets = targets
         self.alpha1 = alpha1
         self.alpha2 = alpha2
         self.beta1 = beta1
         self.beta2 = beta2
         self.threshold = threshold
-
+        self.type_sensor = range(types)
+    
     def _distance(self, x, y):
         return math.sqrt((x[0]-y[0])**2 + (x[1] - y[1]) ** 2)
     
@@ -54,42 +57,61 @@ class ObjectiveFunction(object):
         
         used = []
         for sensor in x:
-            if sensor[0] == -1 or sensor[1] == -1:
+            if sensor[0] < 0 or sensor[1] < 0:
                 continue
             else:
                 used.append(sensor)
         
-        covered = []
-        for t in targets:
-            pt = 1
-            for sensor in used:
-                p = self._psm(sensor, t, type=0)
-                if p==0:
-                    continue
-                pt = pt*p
-            pt = 1-pt
+        # 2^n cal
+        best_sol = float('-inf')
+        trace_case = None
+        for case in product(self.type_sensor, repeat=len(used)):
+            covered = []
+            for t in targets:
+                pt = 1
+                for index, sensor in enumerate(used):
+                    p = self._psm(sensor, t, type=case[index])
+                    if p==0:
+                        continue
+                    pt = pt*p
+                
+                pt = 1-pt
 
-            if pt >= self.threshold:
-                covered.append(t)
+                if pt >= self.threshold:
+                    covered.append(t)
+            
+            min_dist_sensor = float('+inf')
+            for ia, a in enumerate(used):
+                for ib, b in enumerate(used):
+                    if a!=b:
+                        min_dist_sensor = min(min_dist_sensor, self._distance(a, b)*case[ia]*case[ib])
+            
+            diagonal = [self._distance([W, H], [R[i]-UE[i], R[i]-UE[i]]) for i in range(len(R))]
+
+
+            ## 2/3 objective 
+            obj = (len(covered)/no_cells ) * (max(max_noS)-min(min_noS))/(len(used)-min(min_noS)) * min_dist_sensor/max(diagonal)
+
+            
+            if obj > best_sol:
+                best_sol = obj
+                trace_case = case
         
-
-        obj = (len(used)/no_cells ) * (len(covered)-min_noS[0])/(max_noS[0]-min_noS[0])  
-
-
-        return obj
+        return best_sol, trace_case
 
             
                         
     
 class HarmonySearch(object):
-    def __init__(self, objective_function, hms=20, size=10, hcmr=0.9, par=0.1):
+    def __init__(self, objective_function, hms=30, size=10, hcmr=0.9, par=0.3, BW=0.2):
         
         self._obj_fun = objective_function
 
         self.hms = hms
         self.size = size
         self.hcmr = hcmr
-        self.par = par 
+        self.par = par
+        self.BW = BW 
 
     def run(self, step=100):
 
@@ -118,10 +140,11 @@ class HarmonySearch(object):
                 else:
                     new_harmony.append(self._random_selection())
             
-            new_fitness = self._obj_fun.get_fitness(new_harmony)
+            new_fitness, _ = self._obj_fun.get_fitness(new_harmony)
             best = self._update_harmony_memory(new_harmony, new_fitness)
           
-            
+            print("gen", generation, " with best =", best)
+
             generation += 1
             
             self._harmony_history.append({'gen': generation, 'harmonies': copy.deepcopy(self._harmony_memory)})
@@ -143,8 +166,8 @@ class HarmonySearch(object):
             harmony = list()
             for j in range(0, size):
                 harmony.append(self._random_selection())
-
-            fitness = self._obj_fun.get_fitness(harmony)
+            
+            fitness, _ = self._obj_fun.get_fitness(harmony)
 
             self._harmony_memory.append((harmony, fitness))
 
@@ -159,14 +182,19 @@ class HarmonySearch(object):
 
     def _pitch_adjustment(self,  i):
 
-        return [random.random(), random.random()]
+        return [(2*random.random()-1)*self.BW, (2*random.random()-1)*self.BW]
 
     
     def _random_selection(self):
         
         if random.random() < 0.8:
-            x = lower[0][0] + (upper[0][0] - lower[0][0])*random.random()
-            y = lower[0][1] + (upper[0][1] - lower[0][1])*random.random()
+            choice = random.randint(0, 1)
+            if choice == 0:
+                x = lower[0][0] + (upper[0][0] - lower[0][0])*random.random()
+                y = lower[0][1] + (upper[0][1] - lower[0][1])*random.random()
+            else:
+                x = lower[1][0] + (upper[1][0] - lower[1][0])*random.random()
+                y = lower[1][1] + (upper[1][1] - lower[1][1])*random.random()
         else: # unused position
             x = -1 
             y = -1
@@ -190,10 +218,12 @@ class HarmonySearch(object):
                 self._harmony_memory[worst_index] = (considered_harmony, considered_fitness)
 
             return best_index, best_fitness
-obj = ObjectiveFunction(1000)
+
+
+obj = ObjectiveFunction(targets)
 hsa = HarmonySearch(obj)
 
-best_harmony, best_fitness, bank, history = hsa.run(30)
+best_harmony, best_fitness, bank, history = hsa.run(100)
 
 print(best_harmony)
 print(best_fitness)
@@ -206,6 +236,6 @@ ysensor = [x[1] for x in best_harmony]
 s = [R[0]*20*20*4 for i in range(len(xsensor))]
 
 plt.scatter(xtarget, ytarget)
-plt.scatter(xsensor, ysensor, s=s)
+plt.scatter(xsensor, ysensor)
 
 plt.show()
