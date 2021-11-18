@@ -35,6 +35,7 @@ class ObjectiveFunction(object):
         self.beta2 = beta2
         self.threshold = threshold
         self.type_sensor = range(types)
+        self.diagonal = [self._distance([W, H], [R[i]-UE[i], R[i]-UE[i]]) for i in range(len(R))]
     
     def _distance(self, x, y):
         return math.sqrt((x[0]-y[0])**2 + (x[1] - y[1]) ** 2)
@@ -64,7 +65,9 @@ class ObjectiveFunction(object):
         
         # 2^n cal
         best_sol = float('-inf')
-        trace_case = None
+        best_trace = None
+        best_covered = None
+        best_no = None
         for case in product(self.type_sensor, repeat=len(used)):
             covered = []
             for t in targets:
@@ -86,29 +89,31 @@ class ObjectiveFunction(object):
                     if a!=b:
                         min_dist_sensor = min(min_dist_sensor, self._distance(a, b)*case[ia]*case[ib])
             
-            diagonal = [self._distance([W, H], [R[i]-UE[i], R[i]-UE[i]]) for i in range(len(R))]
+            
 
 
-            ## 2/3 objective 
-            obj = (len(covered)/no_cells ) * (max(max_noS)-min(min_noS))/(len(used)-min(min_noS)) * min_dist_sensor/max(diagonal)
+            ## 3s/3 objective 
+            obj = (len(covered)/no_cells ) * (max(max_noS)-min(min_noS))/(len(used)-min(min_noS)) * min_dist_sensor/max(self.diagonal)
 
             
             if obj > best_sol:
                 best_sol = obj
-                trace_case = case
+                best_trace = case
+                best_covered = len(covered)
+                best_no = len(used)
         
-        return best_sol, trace_case
+        
+        return best_sol, (best_covered, best_no, best_trace)
 
-            
-                        
-    
+
 class HarmonySearch(object):
-    def __init__(self, objective_function, hms=30, size=10, hcmr=0.9, par=0.3, BW=0.2):
+    def __init__(self, objective_function, hms=30, hcmr=0.9, par=0.3, BW=0.2):
         
         self._obj_fun = objective_function
 
+        # self.size = random.randint(min(min_noS), max(max_noS))
         self.hms = hms
-        self.size = size
+        self.size = 15
         self.hcmr = hcmr
         self.par = par
         self.BW = BW 
@@ -129,36 +134,49 @@ class HarmonySearch(object):
             for i in range(0, self.size):
                 if random.random() < self.hcmr:
                     new_harmony.append(self._memory_consideration(i))
-                    if random.random() < self.par:
-                        _amount = self._pitch_adjustment(i)
-                        if random.random() < 0.5:
+
+                    if random.random() < self.par and (new_harmony[i][0] != -1 and new_harmony[i][1]!= -1):
+                        while True:
+                            _amount = self._pitch_adjustment(i)
                             new_harmony[i][0] += _amount[0]
                             new_harmony[i][1] += _amount[1]
-                        else:
+                            if self._checkValidPosition(new_harmony[i]):
+                                break 
                             new_harmony[i][0] -= _amount[0]
                             new_harmony[i][1] -= _amount[1]
+
+
                 else:
                     new_harmony.append(self._random_selection())
             
-            new_fitness, _ = self._obj_fun.get_fitness(new_harmony)
-            best = self._update_harmony_memory(new_harmony, new_fitness)
+            new_fitness = self._obj_fun.get_fitness(new_harmony)
+            best_index, best_fitness = self._update_harmony_memory(new_harmony, new_fitness)
           
-            print("gen", generation, " with best =", best)
+            print("gen", generation, " with best =", best_fitness[0], "cover: ", best_fitness[1][0], " used: ", best_fitness[1][1])
 
             generation += 1
             
             self._harmony_history.append({'gen': generation, 'harmonies': copy.deepcopy(self._harmony_memory)})
             
-
+    
         # return best harmony
         best_harmony = None
+        best = float('-inf')
         best_fitness = float('-inf')
         for harmony, fitness in self._harmony_memory:
-            if fitness > best_fitness:
+            if fitness[0] > best:
+                best = fitness[0]
                 best_harmony = harmony
                 best_fitness = fitness
-            
-        return best_harmony, best_fitness, self._harmony_memory, self._harmony_history
+
+        return best_harmony, best_fitness
+    
+    def _checkValidPosition(sel, position):
+        if(position[0] >= 0 and position[1] >= 1):
+            return True
+        if(position[0] == -1 and position[1] == -1):
+            return True
+        return False
 
     def _initialize(self, hms, size):
      
@@ -167,7 +185,7 @@ class HarmonySearch(object):
             for j in range(0, size):
                 harmony.append(self._random_selection())
             
-            fitness, _ = self._obj_fun.get_fitness(harmony)
+            fitness = self._obj_fun.get_fitness(harmony)
 
             self._harmony_memory.append((harmony, fitness))
 
@@ -203,18 +221,23 @@ class HarmonySearch(object):
     def _update_harmony_memory(self, considered_harmony, considered_fitness):
         if (considered_harmony, considered_fitness) not in self._harmony_memory:
             worst_index = None
-            worst_fitness = float('+inf')
+            worst = float('+inf')
+            worst_fitness = None
             best_index = None 
-            best_fitness = float('-inf')
+            best = float('-inf')
+            best_fitness = None
+
             for i, (harmony, fitness) in enumerate(self._harmony_memory):
-                if fitness < worst_fitness:
+                if fitness[0] < worst:
+                    worst = fitness[0]
                     worst_index = i
                     worst_fitness = fitness
-                if fitness > best_fitness:
+                if fitness[0] > best:
+                    best = fitness[0]
                     best_index = i 
                     best_fitness = fitness
             
-            if (considered_fitness > worst_fitness):
+            if (considered_fitness[0] > worst):
                 self._harmony_memory[worst_index] = (considered_harmony, considered_fitness)
 
             return best_index, best_fitness
@@ -223,10 +246,11 @@ class HarmonySearch(object):
 obj = ObjectiveFunction(targets)
 hsa = HarmonySearch(obj)
 
-best_harmony, best_fitness, bank, history = hsa.run(100)
+best_harmony, best_fitness= hsa.run(100)
 
 print(best_harmony)
 print(best_fitness)
+
 
 
 xtarget = [x[0] for x in targets]
