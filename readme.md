@@ -7,7 +7,7 @@ Natural-based algorithms for sensor deployment in heterogeneous wireless sensor 
 2. https://www.researchgate.net/publication/4279261_Pareto-based_Multi-Objective_Machine_Learning
 
 ## Need to fix
-1. Initilize choice ?
+1. Initilize choice ? HMV
 2. Valid harmony ? 
 3. Computation for objective ?
 

@@ -21,7 +21,7 @@ lower = [(ue, ue) for ue in UE]
 upper = [(H-l[0], W-l[1]) for l in lower]
 
 
-min_noS = [int((W*H)/(36*ue**ue)) for ue in UE]
+min_noS = [int((W*H)/(36*ue*ue)) for ue in UE]
 max_noS = [int((W*H)/(4*ue*ue)) for ue in UE]
 
 
@@ -63,14 +63,25 @@ class ObjectiveFunction(object):
             else:
                 used.append(sensor)
         
+        if len(used) < min(min_noS):
+            return float('-inf'), (0, 0, (0)*len(used))
+        
         # 2^n cal
         best_sol = float('-inf')
         best_trace = None
         best_covered = None
         best_no = None
         for case in product(self.type_sensor, repeat=len(used)):
+            # print(case)
             covered = []
             for t in targets:
+                # ov = []
+                # ovtype = []
+                # for index, sensor in enumerate(used):
+                #     if self._distance(sensor, t) < R[case[index]]:
+                #         ov.append(sensor)
+                #         ovtype.append(case[index])
+
                 pt = 1
                 for index, sensor in enumerate(used):
                     p = self._psm(sensor, t, type=case[index])
@@ -84,17 +95,20 @@ class ObjectiveFunction(object):
                     covered.append(t)
             
             min_dist_sensor = float('+inf')
-            for ia, a in enumerate(used):
-                for ib, b in enumerate(used):
-                    if a!=b:
-                        min_dist_sensor = min(min_dist_sensor, self._distance(a, b)*case[ia]*case[ib])
+            if len(used) == 1:
+                min_dist_sensor = 0
+            else:
+                for ia, a in enumerate(used):
+                    for ib, b in enumerate(used):
+                        if a!=b:
+                            min_dist_sensor = min(min_dist_sensor, self._distance(a, b)/(R[case[ia]]*R[case[ib]]))
             
             
 
 
             ## 3s/3 objective 
-            obj = (len(covered)/no_cells ) * (max(max_noS)-min(min_noS))/(len(used)-min(min_noS)) * min_dist_sensor/max(self.diagonal)
-
+            obj = (len(covered)/no_cells)**2 * (max(max_noS)-min(min_noS)+1)/(len(used)-min(min_noS)+1) * min_dist_sensor/max(self.diagonal)
+            
             
             if obj > best_sol:
                 best_sol = obj
@@ -111,12 +125,13 @@ class HarmonySearch(object):
         
         self._obj_fun = objective_function
 
-        # self.size = random.randint(min(min_noS), max(max_noS))
+        self.size = random.randint(min(min_noS), max(max_noS))
         self.hms = hms
-        self.size = 15
+        # self.size = 10
         self.hcmr = hcmr
         self.par = par
         self.BW = BW 
+        print(self.size)
 
     def run(self, step=100):
 
@@ -151,8 +166,8 @@ class HarmonySearch(object):
             
             new_fitness = self._obj_fun.get_fitness(new_harmony)
             best_index, best_fitness = self._update_harmony_memory(new_harmony, new_fitness)
-          
-            print("gen", generation, " with best =", best_fitness[0], "cover: ", best_fitness[1][0], " used: ", best_fitness[1][1])
+
+            print("gen", generation, " with best =", best_fitness[0], "cover: ", best_fitness[1][0], " used: ", best_fitness[1][1], " trace:", best_fitness[1][2])
 
             generation += 1
             
@@ -172,7 +187,7 @@ class HarmonySearch(object):
         return best_harmony, best_fitness
     
     def _checkValidPosition(sel, position):
-        if(position[0] >= 0 and position[1] >= 1):
+        if(position[0] >= 0 and position[1] >= 0):
             return True
         if(position[0] == -1 and position[1] == -1):
             return True
@@ -226,13 +241,13 @@ class HarmonySearch(object):
             best_index = None 
             best = float('-inf')
             best_fitness = None
-
+            
             for i, (harmony, fitness) in enumerate(self._harmony_memory):
-                if fitness[0] < worst:
+                if fitness[0] <= worst:
                     worst = fitness[0]
                     worst_index = i
                     worst_fitness = fitness
-                if fitness[0] > best:
+                if fitness[0] >= best:
                     best = fitness[0]
                     best_index = i 
                     best_fitness = fitness
@@ -245,8 +260,9 @@ class HarmonySearch(object):
 
 obj = ObjectiveFunction(targets)
 hsa = HarmonySearch(obj)
-
-best_harmony, best_fitness= hsa.run(100)
+print(min_noS)
+print(max_noS)
+best_harmony, best_fitness= hsa.run(10000)
 
 print(best_harmony)
 print(best_fitness)
@@ -260,6 +276,6 @@ ysensor = [x[1] for x in best_harmony]
 s = [R[0]*20*20*4 for i in range(len(xsensor))]
 
 plt.scatter(xtarget, ytarget)
-plt.scatter(xsensor, ysensor)
+plt.scatter(xsensor, ysensor, marker='^')
 
 plt.show()
