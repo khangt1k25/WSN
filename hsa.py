@@ -232,7 +232,7 @@ class HarmonySearch(object):
             generation += 1
             
             self._harmony_history.append({'gen': generation, 'harmonies': copy.deepcopy(self._harmony_memory)})
-            
+        
     
         # return best harmony
         best_harmony = None
@@ -342,12 +342,12 @@ class HarmonySearch(object):
 obj = ObjectiveFunction(targets)
 hsa = HarmonySearch(obj, save_dir='./log')
 
-best_harmony= hsa.run(10000)
+best_harmony= hsa.run(100)
 
 best_global = obj.get_fitness(best_harmony)
 
 print("Best Harmony ", best_harmony)
-print("Best Global", best_global)
+print("Best Global", best_global[1])
 
 
 
@@ -357,11 +357,19 @@ xtarget = [x[0] for x in targets]
 ytarget = [x[1] for x in targets]
 xsensor = [x[0] for x in best_harmony]
 ysensor = [x[1] for x in best_harmony]
-s = [R[0]*20*20*4 for i in range(len(xsensor))]
 
-plt.scatter(xtarget, ytarget)
+
+fig, ax = plt.subplots()
+plt.scatter(xtarget, ytarget, marker='x')
 plt.scatter(xsensor, ysensor, marker='^')
+for s in range(len(xsensor)):
+    if xsensor[s] == -1:
+        continue
+    ax.add_patch(plt.Circle((xsensor[s], ysensor[s]), 5, color='r', alpha=0.5, fill=False))
+ax.set_aspect('equal', adjustable='datalim')
+ax.plot()
 
+plt.grid()
 plt.show()
 
 
