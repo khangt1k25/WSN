@@ -74,7 +74,7 @@ class ObjectiveFunction(object):
         best_covered = None
         best_case = None
         best_true_covered = None
-        random_cases = [[random.randint(0, self.types-1) for j in range(len(used))] for i in range(10)]
+        random_cases = [[random.randint(0, self.types-1) for j in range(len(used))] for i in range(1)]
         for case in random_cases:
             covered = []
             true_covered = []
@@ -92,7 +92,8 @@ class ObjectiveFunction(object):
                     pt = pt*p
                     nov += 1
                 pt = 1.-pt
-                if pt >= self.threshold or (nov==1 and (1.-pt)>=self.threshold):
+                # if pt >= self.threshold or (nov==1 and (1.-pt)>=self.threshold):
+                if pt>=self.threshold or (nov==1):
                     covered.append(t)
             
             min_dist_sensor = float('+inf')
@@ -113,7 +114,7 @@ class ObjectiveFunction(object):
             obj2 = (1/(10*obj2+1))**self.coeff[1]
             obj3 = obj3**self.coeff[2] 
             
-            
+
             ## 3s/3 objective 
             obj = obj1 * obj2 * obj3
 
@@ -367,7 +368,7 @@ class HarmonySearch(object):
         return best_index, best_cov_index
 
 
-root_dir = './result/base'
+root_dir = './main/base4'
 
 hsa = HarmonySearch(root_dir=root_dir, coeff=(1, 1, 1))
 
@@ -391,8 +392,8 @@ ysensor_cov = [x for x in ysensor_cov if x!=-1]
 
 fig, (ax1, ax2) = plt.subplots(2)
 
-ax1.scatter(xtarget, ytarget, marker='x')
-ax1.scatter(xsensor_obj, ysensor_obj, marker='^')
+ax1.scatter(xtarget, ytarget, marker=".")
+ax1.scatter(xsensor_obj, ysensor_obj, marker="*")
 for s in range(len(xsensor_obj)):
     if xsensor_obj[s] == -1:
         continue
@@ -402,8 +403,8 @@ ax1.plot()
 ax1.grid()
 # ax1.savefig(os.path.join(root_dir, 'fig_obj.png'))
 
-ax2.scatter(xtarget, ytarget, marker='x')
-ax2.scatter(xsensor_cov, ysensor_cov, marker='^')
+ax2.scatter(xtarget, ytarget, marker=".")
+ax2.scatter(xsensor_cov, ysensor_cov, marker="*")
 for s in range(len(xsensor_cov)):
     if xsensor_cov[s] == -1:
         continue
