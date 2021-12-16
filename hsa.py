@@ -47,15 +47,15 @@ class ObjectiveFunction(object):
         distance = self._distance(x, y)
 
         if distance < R[type] - UE[type] : 
-            return 1
+            return 1, distance
         elif distance > R[type] + UE[type]:
-            return 0
+            return 0, distance
         else:
             lambda1 = UE[type] - R[type] + distance
             lambda2 = UE[type] + R[type] - distance
             lambda1 = math.pow(lambda1, self.beta1)
             lambda2 = math.pow(lambda2, self.beta2)
-            return math.exp(-(self.alpha1*lambda1/lambda2)) + self.alpha2
+            return math.exp(-(self.alpha1*lambda1/lambda2)) + self.alpha2,  distance
 
     def get_fitness(self, x):
         
@@ -80,20 +80,21 @@ class ObjectiveFunction(object):
             true_covered = []
             for t in targets:
                 nov = 0
+                nov_true = 0
                 pt = 1
                 for index, sensor in enumerate(used):
-                    if self._distance(sensor, t) > R[case[index]]:
+                    p, d = self._psm(sensor, t, type=case[index])
+                    if p <= 0:
                         continue
-                
-                    if t not in true_covered:
-                        true_covered.append(t)
-                    
-                    p = self._psm(sensor, t, type=case[index])
                     pt = pt*p
-                    nov += 1
-                pt = 1.-pt
-                # if pt >= self.threshold or (nov==1 and (1.-pt)>=self.threshold):
-                if pt>=self.threshold or (nov==1):
+                    nov += 1;
+                    if d <= R[case[index]]:
+                        if t not in true_covered:
+                            true_covered.append(t)
+                        nov_true += 1 
+                
+                pt = 1.- pt  
+                if (nov >= 2 and pt>=self.threshold) or (nov_true==1 and nov==1 and (1.-pt)>=self.threshold):
                     covered.append(t)
             
             min_dist_sensor = float('+inf')
@@ -368,7 +369,7 @@ class HarmonySearch(object):
         return best_index, best_cov_index
 
 
-root_dir = './main/base4'
+root_dir = './manu/test'
 
 hsa = HarmonySearch(root_dir=root_dir, coeff=(1, 1, 1))
 
