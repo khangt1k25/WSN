@@ -416,8 +416,8 @@ class HarmonySearch(object):
         return best_index, best_cov_index
 
 
-root_dir = './hygge/local100_2'
-hsa = HarmonySearch(root_dir=root_dir, coeff=(1, 1, 1), nperm=100, no_locals=1)
+root_dir = './discover/our1'
+hsa = HarmonySearch(root_dir=root_dir, coeff=(1, 1, 1), nperm=10, no_locals=1)
 
 best_harmony, best_fitness, best_case, best_harmony_cov, best_fitness_cov, best_case_cov = hsa.run(60000)
 
