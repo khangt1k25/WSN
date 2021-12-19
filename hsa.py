@@ -91,7 +91,7 @@ class ObjectiveFunction(object):
                         continue
                     pt = pt*p
                     nov += 1;
-                    if d <= R[case[index]]:
+                    if d <= R[case[index]]//2:
                         if t not in true_covered:
                             true_covered.append(t)
                         nov_true += 1 
@@ -416,8 +416,8 @@ class HarmonySearch(object):
         return best_index, best_cov_index
 
 
-root_dir = './hygge/local100_2'
-hsa = HarmonySearch(root_dir=root_dir, coeff=(1, 1, 1), nperm=100, no_locals=1)
+root_dir = './hygge/testgiang'
+hsa = HarmonySearch(root_dir=root_dir, coeff=(1, 1, 1), nperm=1, no_locals=5)
 
 best_harmony, best_fitness, best_case, best_harmony_cov, best_fitness_cov, best_case_cov = hsa.run(60000)
 
