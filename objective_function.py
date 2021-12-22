@@ -1,6 +1,8 @@
 import math
 from itertools import product
 import random
+import numpy as np
+
 
 class ObjectiveFunction():
     def __init__(self, hmv, hms, targets, types=2, radius=[0,0], alpha1=1, alpha2=0, beta1=1, beta2=0.5,\
@@ -32,15 +34,17 @@ class ObjectiveFunction():
         self.type_sensor = range(types)
         self.w = w
         self.h = h
+    
         self.cell_h = cell_h
         self.cell_w = cell_w
+  
+        self.cell_r = math.sqrt((cell_h/2)**2 + (cell_w/2)**2)
         self.no_cell = (self.w // self.cell_w) * (self.h // self.cell_h)
         self.min_noS = self.w * self.h // ((max(self.radius)**2)*9)
         self.max_noS = self.w * self.h // ((min(self.radius)**2))
         self.max_diagonal = max([self._distance([self.w, self.h], [self.radius[i] + self.ue[i], self.radius[i] + self.ue[i]]) for i in range(len(self.radius))])
     
-    def get_num_parameters(self):
-        return self.hmv
+
 
     def get_hms(self):
         return self.hms
@@ -92,6 +96,39 @@ class ObjectiveFunction():
             min_dist_sensor = 0.0
         return min_dist_sensor / (self.max_diagonal)
 
+    # Keep overlap sensor
+    def _regularization1(self, node_list, type_assignment):
+        no_interception = 0
+        for ia, a in enumerate(node_list):
+            for ib, b in enumerate(node_list):
+                if a!=b:
+                    if(self._distance(a, b) < (self.radius[type_assignment[ia]] + self.radius[type_assignment[ib]])):
+                            no_interception += 1
+        no_interception = no_interception/2
+        n = len(node_list)
+        no_interception = no_interception/(n*(n-1)/2)
+        
+        return no_interception
+    
+
+    ## Keep one sensor in one cell
+    def _regularization2(self, node_list, type_assignment):
+        node_in_cells = []
+        for target in self.targets:
+            s = 0
+            for node in node_list:
+                if self._distance(target, node) <= self.cell_r:
+                    s+=1
+            node_in_cells.append(s)
+        
+        node_in_cells = [ele/25 for ele in node_in_cells]
+        gt = [1.0/25]*len(self.targets)
+
+        loss = np.square(np.subtract(node_in_cells, gt)).sum()
+        
+        return loss 
+
+
     def get_fitness(self, harmony):
 
         used = []
@@ -105,7 +142,7 @@ class ObjectiveFunction():
         if len(used) < self.min_noS:
                 return (float('-inf'), 0), []
 
-        type_traces = [[random.choice([0, 1]) for j in range(len(used))] for i in range(5)]
+        type_traces = [[random.choice([0, 1]) for j in range(len(used))] for i in range(1)]
         
         best_fitness = float('-inf')
         best_coverage_ratio = 0
@@ -116,6 +153,7 @@ class ObjectiveFunction():
             coverage_ratio, _ = self._coverage_ratio(used, type_trace)
             
             fitness =  (coverage_ratio)  * self._senscost(used)* self._md(used, type_trace)
+            # fitness =  (coverage_ratio)  * self._senscost(used)* self._regularization2(used, type_trace)
 
             if fitness > best_fitness:
                 best_fitness = fitness

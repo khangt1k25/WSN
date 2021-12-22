@@ -1,3 +1,4 @@
+from math import inf
 import random
 import logging
 from tqdm import tqdm
@@ -178,11 +179,11 @@ class HarmonySearch():
             position[1] = self.BW*bw_rate + position[1]
         return position
 
-    def _new_harmony_consideration(self, harmony):
+    def _new_harmony_consideration(self, harmony, fitness, type_trace):
         """
             Update harmony memory
         """
-        (fitness, _), type_trace = self._obj_function.get_fitness(harmony)
+        # (fitness, _), type_trace = self._obj_function.get_fitness(harmony)
         
         worst_fitness = float("+inf")
         worst_ind = -1
@@ -241,7 +242,22 @@ class HarmonySearch():
             if item[0] >= 0 and item[1] >= 0:
                 count_ += 1
         return count_
-
+    
+    def _search(self, nSearch):
+        bestharmony = None 
+        besttrace = None
+        best = float('-inf')
+        
+        for i in range(nSearch):
+            candidate_harmony = self._memory_consideration()
+            (candidatefitness, _), type_trace = self._obj_function.get_fitness(candidate_harmony)
+            if candidatefitness > best:
+                best=candidatefitness
+                bestharmony = candidate_harmony
+                besttrace=type_trace
+        
+        return bestharmony, best, besttrace
+    
     def run(self, type_init="default", min_valid=14,steps=100, threshold=0.9,order=0, logger=None):
         
         print("Start run:")
@@ -249,9 +265,10 @@ class HarmonySearch():
 
         best_ind = -1
         for i in tqdm(range(steps)):
-            new_harmony = self._memory_consideration()
+            # new_harmony = self._memory_consideration()
+            new_harmony, new_fitness, new_trace = self._search(10)
 
-            new_best_ind = self._new_harmony_consideration(new_harmony)
+            new_best_ind = self._new_harmony_consideration(new_harmony, new_fitness, new_trace)
 
             best_harmony, best_type, best_fitness = self._harmony_memory[best_ind]
             
