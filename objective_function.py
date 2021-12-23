@@ -108,7 +108,7 @@ class ObjectiveFunction():
         n = len(node_list)
         no_interception = no_interception/(n*(n-1)/2)
         
-        return no_interception
+        return 1-no_interception
     
 
     ## Keep one sensor in one cell
@@ -119,15 +119,22 @@ class ObjectiveFunction():
             for node in node_list:
                 if self._distance(target, node) <= self.cell_r:
                     s+=1
-            node_in_cells.append(s)
+            if s==1:
+                node_in_cells.append(s)
         
-        node_in_cells = [ele/25 for ele in node_in_cells]
-        gt = [1.0/25]*len(self.targets)
+        # node_in_cells = [ele/25 for ele in node_in_cells]
+        # gt = [1.0/25]*len(self.targets)
 
-        loss = np.square(np.subtract(node_in_cells, gt)).sum()
+        # loss = np.square(np.subtract(node_in_cells, gt)).sum()
         
-        return loss 
+        return len(node_in_cells)
 
+    def _regularization3(self, node_list, type_assignment):
+        no_used = len(node_list)
+
+        no_used_convert = sum(type_assignment) + (len(type_assignment)-sum(type_assignment))/2
+
+        return 1- no_used_convert/25
 
     def get_fitness(self, harmony):
 
@@ -152,8 +159,8 @@ class ObjectiveFunction():
         
             coverage_ratio, _ = self._coverage_ratio(used, type_trace)
             
-            fitness =  (coverage_ratio)  * self._senscost(used)* self._md(used, type_trace)
-            # fitness =  (coverage_ratio)  * self._senscost(used)* self._regularization2(used, type_trace)
+            # fitness =  (coverage_ratio)  * self._senscost(used)* self._md(used, type_trace) * self._regularization1(used, type_trace)
+            fitness =  (coverage_ratio)  * self._senscost(used)* self._regularization2(used, type_trace)
 
             if fitness > best_fitness:
                 best_fitness = fitness
