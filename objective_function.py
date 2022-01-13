@@ -110,7 +110,6 @@ class ObjectiveFunction():
         
         return 1-no_interception
     
-
     ## Keep one sensor in one cell
     def _regularization2(self, node_list, type_assignment):
         node_in_cells = []
@@ -154,13 +153,18 @@ class ObjectiveFunction():
         best_fitness = float('-inf')
         best_coverage_ratio = 0
         best_trace = None
-
+            
         for type_trace in type_traces:
         
             coverage_ratio, _ = self._coverage_ratio(used, type_trace)
             
-            # fitness =  (coverage_ratio)  * self._senscost(used)* self._md(used, type_trace) * self._regularization1(used, type_trace)
-            fitness =  (coverage_ratio)  * self._senscost(used)* self._regularization2(used, type_trace)
+            # fitness =  (coverage_ratio)  * self._senscost(used)* self._md(used, type_trace)
+            # fitness =  (coverage_ratio)  * self._senscost(used)*\
+            #     self._regularization3(used, type_trace)
+            fitness =  (coverage_ratio)  * self._senscost(used) * self._md(used, type_trace)
+                # self._regularization3(used, type_trace)
+
+                # *\ #* self._regularization1(used, type_trace) #*\
 
             if fitness > best_fitness:
                 best_fitness = fitness

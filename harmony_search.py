@@ -5,6 +5,8 @@ from tqdm import tqdm
 from visualize import draw
 import numpy as np 
 import os 
+from sklearn.cluster import KMeans
+
 class HarmonySearch():
     def __init__(self, objective_function, AoI, cell_size, hms=30, hmv=7, hmcr=0.9, par=0.3, BW=0.2, lower=[], upper=[], min_no = 0, savedir = './baseline'):
         """
@@ -51,7 +53,7 @@ class HarmonySearch():
         handler2.setFormatter(formatter2)
         self.logger2.addHandler(handler2)
         self.best_coverage = 0
-
+    
     def _random_selection(self, min_valid):
         harmony = []
         for each_node in range(self.hmv):
@@ -68,48 +70,33 @@ class HarmonySearch():
     def _centroid_selection(self, min_valid):
         num_width_cell = self.AoI[0] // self.cell_size[0]
         num_height_cell = self.AoI[1] // self.cell_size[1]
-        # harmony = [[-1, -1]] * self.hmv
-        # type_trace = [random.choice(range(len(self.upper))) for i in range(self.hmv)]
-        # valid_nodes = random.sample(range(self.hmv), random.randrange(min_valid, num_width_cell*num_height_cell + 1))
-        # id_valid_cell = random.sample(range(num_width_cell*num_height_cell), len(valid_nodes))
         id_valid_cell = list(range(self.hmv))
         random.shuffle(id_valid_cell)
         harmony = []
-        type_trace = []
         for ids in range(self.hmv):
             type_ = random.choice([0,1])
             width_coor = id_valid_cell[ids] % num_width_cell
             height_coor = id_valid_cell[ids] // num_width_cell
             x = width_coor * self.cell_size[0] + self.cell_size[0] / 2
             y = height_coor * self.cell_size[1] + self.cell_size[1] / 2
-            # harmony[each_node] = [x, y]
-            # type_trace[each_node] = type_
             harmony.append([x, y])
-            type_trace.append(type_)
-        return harmony, type_trace
+        
+        return harmony
         
     def _cell_selection(self, min_valid):
         num_width_cell = self.AoI[0] // self.cell_size[0]
         num_height_cell = self.AoI[1] // self.cell_size[1]
-        # harmony = [[-1, -1]] * self.hmv
-        # type_trace = [random.choice(range(len(self.upper))) for i in range(self.hmv)]
-        # valid_nodes = random.sample(range(self.hmv), random.randrange(min_valid, num_width_cell*num_height_cell + 1))
-        # id_valid_cell = random.sample(range(num_width_cell*num_height_cell), len(valid_nodes))
         id_valid_cell = list(range(self.hmv))
         random.shuffle(id_valid_cell)
         harmony = []
-        type_trace = []
         for ids in range(self.hmv):
             type_ = random.choice([0,1])
             width_coor = id_valid_cell[ids] % num_width_cell
             height_coor = id_valid_cell[ids] // num_width_cell
             x = width_coor * self.cell_size[0] + self.cell_size[0]*random.random()
             y = height_coor * self.cell_size[1] + self.cell_size[1]*random.random()
-            # harmony[each_node] = [x, y]
-            # type_trace[each_node] = type_
             harmony.append([x, y])
-            type_trace.append(type_)
-        return harmony, type_trace
+        return harmony
 
     def _initialize_harmony(self, type = "default", min_valid=14, initial_harmonies=None):
         """
@@ -132,13 +119,15 @@ class HarmonySearch():
                     self._harmony_memory.append((harmony, type_trace, fitness[0]))
             elif type == "centroid":
                 for _ in range(0, self._obj_function.get_hms()):
-                    harmony, type_trace = self._centroid_selection(min_valid)
-                    self._harmony_memory.append((harmony,type_trace, self._obj_function.get_fitness((harmony, type_trace))[0]))
+                    harmony = self._centroid_selection(min_valid)
+                    fitness, type_trace = self._obj_function.get_fitness(harmony)
+                    self._harmony_memory.append((harmony, type_trace, fitness[0]))
             elif type == "cell":
                 for _ in range(0, self._obj_function.get_hms()):
-                    harmony, type_trace = self._cell_selection(min_valid)
-                    self._harmony_memory.append((harmony,type_trace, self._obj_function.get_fitness((harmony, type_trace))[0]))
-
+                    harmony = self._cell_selection(min_valid)
+                    fitness, type_trace = self._obj_function.get_fitness(harmony)
+                    self._harmony_memory.append((harmony, type_trace, fitness[0]))
+    
     def _memory_consideration(self):
         """
             Generate new harmony from previous harmonies in harmony memory
@@ -257,7 +246,50 @@ class HarmonySearch():
                 besttrace=type_trace
         
         return bestharmony, best, besttrace
+
+    def kmeansplusplus(self, data, k):
+        ## initialize the centroids list and add
+        ## a randomly selected data point to the list
+        centroids = []
+
+        centroids_index = []
+        s = np.random.randint(
+                data.shape[0])
+        centroids_index.append(s)
+        centroids.append(data[s, :])
+
+        ## compute remaining k - 1 centroids
+        for c_id in range(k - 1):
+            ## initialize a list to store distances of data
+            ## points from nearest centroid
+            dist = []
+            for i in range(data.shape[0]):
+                point = data[i, :]
+                d = float('+inf')
+                ## compute distance of 'point' from each of the previously
+                ## selected centroid and store the minimum distance
+                for j in range(len(centroids)):
+                    temp_dist = self._obj_function._distance(point, centroids[j])
+                    d = min(d, temp_dist)
+                dist.append(d)
+                
+            ## select data point with maximum distance as our next centroid
+            dist = np.array(dist)
+            next_centroid = data[np.argmax(dist), :]
+            index = np.argmax(dist)
+            centroids_index.append(index)
+            centroids.append(next_centroid)
+            dist = []
+
+        return np.array(centroids), np.array(centroids_index)    
     
+    def kmeansfull(self, data, k):
+        kmeans = KMeans(n_clusters=k)
+        kmeans.fit(data)
+        return kmeans.cluster_centers_.tolist()
+
+
+
     def run(self, type_init="default", min_valid=14,steps=100, threshold=0.9,order=0, logger=None):
         
         print("Start run:")
@@ -265,8 +297,8 @@ class HarmonySearch():
 
         best_ind = -1
         for i in tqdm(range(steps)):
-            # new_harmony = self._memory_consideration()
-            new_harmony, new_fitness, new_trace = self._search(10)
+
+            new_harmony, new_fitness, new_trace = self._search(1)
 
             new_best_ind = self._new_harmony_consideration(new_harmony, new_fitness, new_trace)
 
@@ -299,6 +331,88 @@ class HarmonySearch():
         
         return best_fitness, coverage, no_used, no_used_convert
     
+    def pick_one_node(self, id, i):
+        if random.random() < self.hmcr:
+            while True:
+                id_rand = random.choice(range(self.hms))
+                [x, y] = self._harmony_memory[id_rand][0][i]
+                x, y = self._pitch_adjustment([x, y])
+                if id_rand != id:
+                    break
+                
+        else:
+            type =random.randint(0, 1)
+            if type == 0:
+                x = self.lower[0][0] + (self.upper[0][0] - self.lower[0][0])*random.random()
+                y = self.lower[0][1] + (self.upper[0][1] - self.lower[0][1])*random.random()
+            else:
+                x = self.lower[1][0] + (self.upper[1][0] - self.lower[1][0])*random.random()
+                y = self.lower[1][1] + (self.upper[1][1] - self.lower[1][1])*random.random()
+        return [x, y]
+
+    def run2(self, type_init="default", min_valid=14,steps=100, threshold=0.9,order=0, logger=None):
+
+        self._initialize_harmony(type_init, min_valid)
+
+        best_ind = -1
+        for i in tqdm(range(steps)):
+            id = random.choice(range(self.hms))
+            # id = best_ind
+            base = []
+            for r in self._harmony_memory[id][0]:
+                if r[0] == -1 or r[1] == -1:
+                    continue
+                base.append(r)
+            
+            k = len(base)//5
+            # k=5      
+            new_harmony = self.kmeansfull(data=np.array(base), k=k)
+
+            for j in range(0, self.hmv):
+                if j < k:
+                    x, y = self._pitch_adjustment(new_harmony[j])
+                else:
+                    x, y = self.pick_one_node(j, id)
+                    new_harmony.append([x, y])
+
+                if x > self.upper[1][0] or x < self.lower[0][0]:
+                    x = -1
+                if y > self.upper[1][1] or y < self.lower[0][1]:
+                    y = -1
+
+                new_harmony[j] = x, y
+                
+
+
+            (new_fitness, _), new_trace = self._obj_function.get_fitness(new_harmony)
+            new_best_ind = self._new_harmony_consideration(new_harmony, new_fitness, new_trace)
+
+            best_harmony, best_type, best_fitness = self._harmony_memory[best_ind]
+            
+            if new_best_ind != best_ind:
+                best_ind = new_best_ind
+                logger.info(f'Step: {str(i)} Best harmony: {str(best_harmony)} Type: {str(best_type)} Best_fitness: {str(best_fitness)}')
+                logger.info('------------------------------------------------------------------------------------')
+
+        best_harmony, best_type, best_fitness = self._harmony_memory[best_ind]
+        
+   
+        used_node = []
+        type_trace = best_type
+        for ind, node in enumerate(best_harmony):
+            if node[0] > 0 and node[1] > 0:
+                used_node.append(node)
+        coverage = self._obj_function.get_coverage_ratio(used_node, type_trace)
+        no_used = len(used_node)
+        no_used_convert = sum(type_trace) + (len(type_trace)-sum(type_trace))/2
+
+        draw(used_node, type_trace, os.path.join(self.image_dir, './fig{}.png'.format(str(order))))
+        # save the best for1 runs
+        self.logger2.info(f'Best harmony: {str(best_harmony)}\nType: {str(type_trace)}\nBest_fitness: {str(best_fitness)}\nCoressponding coverage: {str(coverage)} \nCoressponding sensors: {str(no_used)} and {str(no_used_convert)}')
+        self.logger2.info('------------------------------------------------------------------------------------')
+        
+        return  best_fitness, coverage, no_used, no_used_convert
+
     def test(self, type_init="default", min_valid=14, steps=60000, threshold=0.9, file='logging.txt', num_run=12):
         coverage = []
         fitness = []
