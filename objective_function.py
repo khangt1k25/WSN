@@ -110,7 +110,7 @@ class ObjectiveFunction():
         
         return 1-no_interception
     
-    ## Keep one sensor in one cell
+    ## Keep every cell has 1 sensor (HARD)
     def _regularization2(self, node_list, type_assignment):
         node_in_cells = []
         for target in self.targets:
@@ -121,18 +121,25 @@ class ObjectiveFunction():
             if s==1:
                 node_in_cells.append(s)
         
-        # node_in_cells = [ele/25 for ele in node_in_cells]
-        # gt = [1.0/25]*len(self.targets)
-
-        # loss = np.square(np.subtract(node_in_cells, gt)).sum()
-        
         return len(node_in_cells)
+    
+    ##  Keep target inside one Sensor range
+    def _regularization4(self, node_list, type_assignment):
+        node_per_cells = []
+        for target in self.targets:
+            s = 0
+            for inode, node in enumerate(node_list):
+                if self._distance(target, node) <= type_assignment[inode]:
+                    s+=1
+            if s==1:
+                node_per_cells.append(s)
+        
+        return len(node_per_cells)
 
+    ## Keep no sensor but count type assigment
     def _regularization3(self, node_list, type_assignment):
-        no_used = len(node_list)
-
+        # no_used = len(node_list)
         no_used_convert = sum(type_assignment) + (len(type_assignment)-sum(type_assignment))/2
-
         return 1- no_used_convert/25
 
     def get_fitness(self, harmony):
@@ -159,10 +166,10 @@ class ObjectiveFunction():
             coverage_ratio, _ = self._coverage_ratio(used, type_trace)
             
             # fitness =  (coverage_ratio)  * self._senscost(used)* self._md(used, type_trace)
-            # fitness =  (coverage_ratio)  * self._senscost(used)*\
+            fitness =  (coverage_ratio)  * self._senscost(used)
             #     self._regularization3(used, type_trace)
-            fitness =  (coverage_ratio)  * self._senscost(used) * self._md(used, type_trace)
-                # self._regularization3(used, type_trace)
+            # fitness =  (coverage_ratio)  * self._senscost(used) * self._regularization4(used, type_trace) * self._regularization3(used, type_trace)*\
+            #      self._regularization1(used, type_trace) * self._regularization2(used, type_trace) 
 
                 # *\ #* self._regularization1(used, type_trace) #*\
 
